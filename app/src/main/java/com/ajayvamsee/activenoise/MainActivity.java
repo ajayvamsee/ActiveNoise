@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat;
 import com.ajayvamsee.activenoise.ml.Model1;
 
 import org.tensorflow.lite.DataType;
+import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
 import java.io.BufferedInputStream;
@@ -24,7 +25,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -40,14 +44,23 @@ public class MainActivity extends AppCompatActivity {
     TextView textView;
     byte[] audioByteArray;
 
-    int block_len=512;
-    int block_shift=128;
+
+    FFTHelper fftHelper=new FFTHelper();
 
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS_STORAGE = {
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
+
+    int block_shift = 128;
+    int block_length = 512;
+    float[] in_buffer;
+    float[] byteToFloat;
+
+    int audioLength;
+    int num_blocks;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,11 +70,14 @@ public class MainActivity extends AppCompatActivity {
 
         checkPermission(PERMISSIONS_STORAGE, REQUEST_EXTERNAL_STORAGE);
 
+
         fileRead();
 
-        //fft();
+        fft();
 
-        modelRunning();
+        //modelRunning();
+
+        //loadModel();
 
 
         textView.setOnClickListener(new View.OnClickListener() {
@@ -73,11 +89,17 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private void loadModel() {
+        IntBuffer outputBuffer=IntBuffer.allocate(2000);
+        Map<Integer,Object> outputMap=new HashMap<>();
+       // outputBuffer.put(0,outputBuffer);
+
+    }
+
     // double array with filled with zeros
     private void fft() {
         String s= new String(audioByteArray);
         double[] DoubleArray=toDouble(audioByteArray);
-
         // Build 2^n array, fill up with zeroes
         boolean exp=false;
         int i=0;
@@ -90,7 +112,6 @@ public class MainActivity extends AppCompatActivity {
                 i++;
             }
         }
-
         double[] Filledup=new double[pow];
         for (int j=0;j<DoubleArray.length;j++){
             Filledup[j]=DoubleArray[j];
@@ -99,6 +120,19 @@ public class MainActivity extends AppCompatActivity {
             Filledup[k]=0;
         }
         System.out.println("Array data"+Arrays.toString(Filledup));
+
+        /*byte[] data = audioByteArray; // Read 4096 bytes
+        byte[][][] res = new byte[1][1][256];
+        for (int x = 0 ; x != 1 ; x++) {
+            for (int y = 0 ; y != 1 ; y++) {
+                for (int z = 0 ; z != 256 ; z++) {
+                    res[x][y][z] = data[1*1*x + 16*y + z];
+                }
+            }
+        }
+*/
+
+
     }
 
     // byte array to double array
@@ -110,6 +144,19 @@ public class MainActivity extends AppCompatActivity {
         }
         return doubles;
     }
+
+    public static float[] byteToFloat(byte[] input) {
+        float[] ret = new float[input.length/4];
+        for (int x = 0; x < input.length; x+=4) {
+            ret[x/4] = ByteBuffer.wrap(input, x, 4).getFloat();
+        }
+        return ret;
+    }
+
+    private float[] toFloat(byte[] data){
+        return ByteBuffer.wrap(data).asFloatBuffer().array();
+    }
+
 
     // read the file in buffer
     private void fileRead() {
@@ -125,9 +172,16 @@ public class MainActivity extends AppCompatActivity {
             }
             out.flush();
             audioByteArray = out.toByteArray();
+
+            byteToFloat =byteToFloat(audioByteArray);
+
+            audioLength=byteToFloat(audioByteArray).length;
+            num_blocks=  (audioLength - (block_length - block_shift)) / block_shift;
+
         } catch (Exception e) {
             e.printStackTrace();
         }
+
 
     }
 
@@ -136,11 +190,16 @@ public class MainActivity extends AppCompatActivity {
         try {
             Model1 model = Model1.newInstance(getApplicationContext());
 
+            ByteBuffer byteBuffer=ByteBuffer.allocateDirect(2*257);
+           // byteBuffer.putFloat();
+
+
+
             // Creates inputs for reference.
             TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 1, 257}, DataType.FLOAT32);
-            inputFeature0.loadBuffer(ByteBuffer.wrap(audioByteArray));
+            inputFeature0.loadBuffer(byteBuffer);
             TensorBuffer inputFeature1 = TensorBuffer.createFixedSize(new int[]{1, 2, 128, 2}, DataType.FLOAT32);
-            inputFeature1.loadBuffer(ByteBuffer.wrap(audioByteArray));
+            inputFeature1.loadBuffer(byteBuffer);
 
             // Runs model inference and gets result.
             Model1.Outputs outputs = model.process(inputFeature0, inputFeature1);
@@ -163,6 +222,15 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Toast.makeText(MainActivity.this, "Permission already granted", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public void blockShift() {
+        for (int i = 0; i < num_blocks; i++) {
+            byteToFloat = Arrays.copyOfRange(byteToFloat, block_shift,(byteToFloat.length - 128));
+
+        }
+
+
     }
 
 }

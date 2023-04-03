@@ -1,6 +1,7 @@
 package com.ajayvamsee.activenoise;
 
 import org.checkerframework.checker.units.qual.C;
+import java.lang.Math;
 
 /**
  * Compilation:  javac FFT.java
@@ -33,7 +34,7 @@ import org.checkerframework.checker.units.qual.C;
 
 public class FFT {
 
-    /*// compute the FFT of x[] ,assuming its length n is a power of 2
+    // compute the FFT of x[] ,assuming its length n is a power of 2
 
     public static Complex[] fft(Complex[] x) {
         int n = x.length;
@@ -183,7 +184,5 @@ public class FFT {
         return y;
     }
 
-
-*/
 
 }
